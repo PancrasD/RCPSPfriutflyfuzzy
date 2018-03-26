@@ -107,7 +107,39 @@ public class Tools {
 		}
 		return flag;
 	}
-
+	/*
+	 * 判断两个个体的schedule是否相等
+	 * @return boolean 相等-true 不相等false
+	 */
+    public static boolean  judgeSameIndividual(List<List<Integer>> schedule,List<List<Integer>>lastSchedule) {
+    
+		//先判断task list 再判断resource list
+		if(judgeListEqual(schedule.get(0),lastSchedule.get(0))){
+			if(judgeListEqual(schedule.get(1),lastSchedule.get(1))){
+				return true;
+			}
+		}
+		return false;
+    	
+    }
+    /*
+     * 判断模糊时间是否相等
+     * @return boolean 相等-true 不相等-false
+     */
+    public static boolean judgeListEqual(List<Integer> list1,List<Integer> list2) {
+    	if(list1.size()!=list2.size()) {
+    		System.out.println("the two list size not equal");
+    		return false;
+    	}
+    	else {
+    		for(int i=0;i<list1.size();i++) {
+    			if(!list1.get(i).equals(list2.get(i))) {
+    				return false;
+    			}
+    		}
+    	}
+    	return true;
+    }
 	/*
 	 * 根据目标值优劣选择出种群
 	 * @ return 目标值最优的个体组

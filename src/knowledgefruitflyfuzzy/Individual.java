@@ -588,7 +588,4 @@ public class Individual {
 	public void setProject(Case project) {
 		this.project = project;
 	}
-	
-
-
 }

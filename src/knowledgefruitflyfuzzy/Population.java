@@ -27,12 +27,6 @@ public class Population {
 		this.project = project;
 		this.population = new Individual[populationSize];
 		if (initial) {
-			//添加多种规则初始化
-			//新方法
-//			Individual individualMin = new Individual(project,"MinProcess");//最小执行时间
-//			Individual individualFirst = new Individual(project,"FirstProcess");//最早执行
-//			this.population[0] = individualMin;
-//			this.population[1] = individualFirst;
 			for (int i = 0; i < populationSize; i++) {
 				Individual individual = new Individual(project);
 				this.population[i] = individual;
@@ -62,7 +56,6 @@ public class Population {
 	public Population getOffSpring_NSFFA() {
 	     //算法求解优化
 		Population OffSpring = new Population(NSFFA.NS,project);
-		
 		// 基于气味搜索，每个个体生成S个个体，种群大小为NS*S
 		Population p1 = this.smell_BasedSearch();
 		//Population p1 = this.smell_BasedSearchDivieded();
@@ -70,10 +63,6 @@ public class Population {
 		Population mp1 = merged(this,p1);
 		// 从混合种群中选择前populationSize个个体作为新一代父代种群
 		Population p2 = mp1.slectPopulation(NSFFA.NS);
-		//基于果蝇交流
-		//Population p3=p2.comunication();
-		//Population mp2 = merged(this,p3);
-		//Population p4 = mp2.slectPopulation(NSFFA.NS);
 		// 基于知识的搜索  基于果蝇指导
 		Population Q = p2.knowledge_BasedSearch();
 		// 将两个种群合并
@@ -83,18 +72,6 @@ public class Population {
 
 		return OffSpring;
 	}
-    /*
-     * 果蝇个体间相互学习 交换任务序列 资源不变
-     */
-	private Population comunication() {
-		// TODO Auto-generated method stub
-		List<Task> tasks = project.getTasks();
-		Population comPopulation=updataAssignTask(this,this,tasks);
-		Population mp2 = merged(this,comPopulation);
-		Population p4 = mp2.slectPopulation(NSFFA.NS);
-		return p4;
-	}
-
 	/*
 	 * 基于知识指导搜索    搜索策略效果不佳 需要添加更多搜索策略改善算法
 	 * 基于气味搜索 基于视觉搜索 基于知识指导  本质上是搜索策略   搜索策略里本质上是个体的改变探索更优解
@@ -110,7 +87,7 @@ public class Population {
 		//更新资源分配概率 没有更新
 		updateResourceProb(EPop,tasks);
 		// 遍历种群的个体，利用最大概率法为每个个体的染色体任务序列重新分配资源
-		Population resPopulation=updateAssignResource(tasks);
+		Population resPopulation=updateAssignResource(this.getPopulation(),tasks);
 		// 选择出最优种群
 		// 将两个种群合并
 		Population resupdateOrigin = merged(this,resPopulation);
@@ -120,13 +97,14 @@ public class Population {
 		Population taskPopulation1=updataAssignTask(resUpdate,EPop,tasks);//两种交叉    后期可以改进交叉算法  更多搜索策略  一种 vs两种 效果都不好
 		Population taskPopulation2=updataAssignTask(EPop,resUpdate,tasks);
 		Population taskPopulation=merged(taskPopulation1,taskPopulation2);
-		// 个体i的染色体结构
-		// 将两个种群合并
 		Population resupdateTaskupdate= merged(resUpdate,taskPopulation);
 		
 		//精英相互学习
-		Population ePopPopulation=updataAssignTask(EPop,EPop,tasks);
+		Population ePopPopulationT=updataAssignTask(EPop,EPop,tasks);
+		Population ePopPopulationR=updateAssignResource(ePopPopulationT.getPopulation(),tasks);
 		//epop调整资源选择最早可以执行的
+		Population ePopPopulation= merged(ePopPopulationR,ePopPopulationT);
+		
 		Population epopAndtaskRes= merged(ePopPopulation,resupdateTaskupdate);
 		// 从混合种群中选择前populationSize个个体作为新一代父代种群
 		newPopulation=epopAndtaskRes.slectPopulation(NSFFA.NS);
@@ -165,6 +143,7 @@ public class Population {
 			}
 			//更改 将经过资源调整的染色体resChromosome的p-q段加入新个体染色体 将ePopChromosome的不属于resChromosome的部分加入新个体 满足紧前紧后关系
 			taskChromosome=groupChromosome(resChromosome,ePopChromosome,p,q,tasks);
+			//精英调整资源
 			// 创建子个体
 			Individual offspring = new Individual(taskChromosome,project);
 			taskPopulation.setIndividual(i, offspring);
@@ -284,13 +263,13 @@ public class Population {
      * @param tasks 任务表
      * @return resPopulation 原始种群经过资源调整后的种群
      */
-	private Population updateAssignResource(List<Task> tasks) {
+	private Population updateAssignResource(Individual[] individuals,List<Task> tasks) {
 		// TODO Auto-generated method stub
-    	Population resPopulation = new Population(this.getPopulationsize(),project);
+    	Population resPopulation = new Population(individuals.length,project);
     	//遍历每一个个体
-    	for (int i = 0; i < this.getPopulationsize(); i++) {
+    	for (int i = 0; i <individuals.length; i++) {
     		
-			Individual parent = this.getPopulation()[i];
+			Individual parent =individuals[i];
 			List<List<Integer>> originChromosome = parent.getChromosome();
 			//复制染色体对象 
 			List<List<Integer>> resChromosome = new ArrayList<>();
@@ -360,12 +339,63 @@ public class Population {
 
 		// 混合种群进行快速排序 混合种群内部也进行了排序
 		// 返回混合种群根据目标值进行排序的个体 
-		List<Individual> indivIndex = Tools.popSort(this, project);//失效
-		for(int i=0;i<num;i++) {
-			//个体是在变的  
-			Individual indiv=new Individual(indivIndex.get(i));
-			newPopulation.setIndividual(i,indiv);
+		List<Individual> indivIndex = Tools.popSort(this, project);
+		//保持多样性 先选择独特的
+		List<Individual> diffrentIndix=new ArrayList<>();
+		List<Individual> alreadyIndix=new ArrayList<>();
+		List<List<Integer>> lastSchedule=indivIndex.get(0).getChromosome();
+		List<Integer> lastobj=new ArrayList<>();
+		diffrentIndix.add(indivIndex.get(0));
+		lastobj=indivIndex.get(0).getObj();
+		
+		for(int k=1;k<indivIndex.size();k++) {
+			List<Integer> obj=indivIndex.get(k).getObj();
+			//判断值是否相等
+			if(Tools.judgeListEqual(obj,lastobj)) {
+				//判断schedule是否相等
+				List<List<Integer>> schedule=indivIndex.get(k).getChromosome();
+				boolean flag=Tools.judgeSameIndividual(schedule,lastSchedule);//相等true 不相等flase
+				if(flag) {
+					//如果相等则添加到已存在
+					alreadyIndix.add(indivIndex.get(k));
+				}
+				else {
+					//不相等则添加到不同表
+					diffrentIndix.add(indivIndex.get(k));
+					//更新lastobj lastSchedule
+					lastobj=obj;
+					lastSchedule=schedule;
+				}
+			}
+			else {
+				diffrentIndix.add(indivIndex.get(k));
+				//更新lastobj lastSchedule
+				lastobj=obj;
+				lastSchedule=indivIndex.get(k).getChromosome();
+			}
 		}
+		//首先在不同表中选择 不够再在相同表中选
+		int diffSize=diffrentIndix.size();
+		if(diffSize>=num) {
+			//满足个数 直接添加
+			for(int i=0;i<num;i++) {
+				//个体是在变的  
+				Individual indiv=new Individual(diffrentIndix.get(i));
+				newPopulation.setIndividual(i,indiv);
+			}
+		}
+		else {
+			//不满足个数要求 先把全部的不同个体添加 然后依次添加相同表里面的
+			for(int i=0;i<diffSize;i++) {
+				Individual indiv=new Individual(diffrentIndix.get(i));
+				newPopulation.setIndividual(i,indiv);
+			   }
+			for(int i=0;i<num-diffSize;i++) {
+				//个体是在变的  
+				Individual indiv=new Individual(alreadyIndix.get(i));
+				newPopulation.setIndividual(diffSize+i,indiv);
+		       }
+		   }
 		return newPopulation;
 	}
 	/*
@@ -556,16 +586,17 @@ public class Population {
 					}
 					offspringChromosome.add(list);
 				}
-				// 随机选择任务序列中的某个位置  对1个任务的资源重新选择  资源调整
-//				int index_t_1 = (int) (Math.random() * offspringChromosome.get(0).size());
-//				int taskID = offspringChromosome.get(0).get(index_t_1);
-//				Task task = project.getTasks().get(taskID - 1);
-//				List<Integer> capapleResource = task.getResourceIDs();
-//				double rd = Math.random() ;
-//				int index_capaple = (int) (rd * capapleResource.size());
-//				int resourceid = capapleResource.get(index_capaple);
-//				offspringChromosome.get(1).set(index_t_1, resourceid);
-				
+				// 随机选择任务序列中的某个位置  对1个任务的资源重新选择  资源调
+                //
+				int index_t_1 = (int) (Math.random() * offspringChromosome.get(0).size());
+				int taskID = offspringChromosome.get(0).get(index_t_1);
+				Task task = project.getTasks().get(taskID - 1);
+				List<Integer> capapleResource = task.getResourceIDs();
+				double rd = Math.random() ;
+				int index_capaple = (int) (rd * capapleResource.size());
+				int resourceid = capapleResource.get(index_capaple);
+				offspringChromosome.get(1).set(index_t_1, resourceid);
+
 				Random rand=new Random();
 				double tprob=rand.nextDouble();
 				if(tprob<0.7) {
